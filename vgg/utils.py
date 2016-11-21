@@ -12,6 +12,11 @@ import numpy as np
 def load_image(path):
     # load image
     img = skimage.io.imread(path)
+    # convert gray-scale pics to rgb
+    if len(img.shape) == 2:
+        pre_sp = img.shape
+        img = skimage.color.gray2rgb(img)
+        print("convert wb to rgb", pre_sp, img.shape)
     img = img / 255.0
     assert (0 <= img).all() and (img <= 1.0).all()
     # print "Original Image Shape: ", img.shape
