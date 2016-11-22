@@ -13,7 +13,7 @@ class Vgg19:
     A trainable version VGG19.
     """
 
-    def __init__(self, batch, vgg19_npy_path=None, trainable=True, ln_mode=False, cln_mode=False):
+    def __init__(self, batch, vgg19_npy_path=None, trainable=True, ln_mode=False, cln_mode=False, bn_mode=False):
         if cln_mode and not ln_mode:
             raise ValueError("unacceptable!")
 
@@ -27,8 +27,10 @@ class Vgg19:
 
         self.ln_mode = ln_mode
         self.cln_mode = cln_mode
+        self.bn_mode = bn_mode
 
         self.batch = batch
+
     def get_tr(self):
         #one = np.ones(1000)
         #self.tr_fc8 = tf.constant(one)
@@ -145,7 +147,87 @@ class Vgg19:
         self.prob = tf.nn.softmax(self.fc8, name="prob")
 
         self.data_dict = None
-    
+
+  def batch_norm(self, x, name):
+    """Batch normalization."""
+    with tf.variable_scope(name):
+      params_shape = [x.get_shape()[-1]]
+
+      beta = tf.get_variable(
+          'beta', params_shape, tf.float64,
+          initializer=tf.constant_initializer(0.0, tf.float64))
+      
+      gamma = tf.get_variable(
+          'gamma', params_shape, tf.float64,
+          initializer=tf.constant_initializer(1.0, tf.float64))
+
+      if self.mode == 'train':
+        mean, variance = tf.nn.moments(x, [0, 1, 2], name='moments')
+
+        moving_mean = tf.get_variable(
+            'moving_mean', params_shape, tf.float64,
+            initializer=tf.constant_initializer(0.0, tf.float64),
+            trainable=False)
+        moving_variance = tf.get_variable(
+            'moving_variance', params_shape, tf.float64,
+            initializer=tf.constant_initializer(1.0, tf.float64),
+            trainable=False)
+
+        self._extra_train_ops.append(moving_averages.assign_moving_average(
+            moving_mean, mean, 0.9))
+        self._extra_train_ops.append(moving_averages.assign_moving_average(
+            moving_variance, variance, 0.9))
+      else:
+        mean = tf.get_variable(
+            'moving_mean', params_shape, tf.float64,
+            initializer=tf.constant_initializer(0.0, tf.float64),
+            trainable=False)
+        variance = tf.get_variable(
+            'moving_variance', params_shape, tf.float64,
+            initializer=tf.constant_initializer(1.0, tf.float64),
+            trainable=False)
+        tf.histogram_summary(mean.op.name, mean)
+        tf.histogram_summary(variance.op.name, variance)
+      # elipson used to be 1e-5. Maybe 0.001 solves NaN problem in deeper net.
+      y = tf.nn.batch_normalization(
+          x, mean, variance, beta, gamma, 0.001)
+      y.set_shape(x.get_shape())
+      return y
+
+  def _residual(self, x, in_filter, out_filter, stride,
+                activate_before_residual=False):
+    """Residual unit with 2 sub layers."""
+    if activate_before_residual:
+      with tf.variable_scope('shared_activation'):
+        x = self._batch_norm('init_bn', x)
+        x = self._relu(x, self.hps.relu_leakiness)
+        orig_x = x
+    else:
+      with tf.variable_scope('residual_only_activation'):
+        orig_x = x
+        x = self._batch_norm('init_bn', x)
+        x = self._relu(x, self.hps.relu_leakiness)
+
+    with tf.variable_scope('sub1'):
+      x = self._conv('conv1', x, 3, in_filter, out_filter, stride)
+
+    with tf.variable_scope('sub2'):
+      x = self._batch_norm('bn2', x)
+      x = self._relu(x, self.hps.relu_leakiness)
+      x = self._conv('conv2', x, 3, out_filter, out_filter, [1, 1, 1, 1])
+
+    with tf.variable_scope('sub_add'):
+      if in_filter != out_filter:
+        orig_x = tf.nn.avg_pool(orig_x, stride, stride, 'VALID')
+        orig_x = tf.pad(
+            orig_x, [[0, 0], [0, 0], [0, 0],
+                     [(out_filter-in_filter)//2, (out_filter-in_filter)//2]])
+      x += orig_x
+
+    tf.logging.info('image after unit %s', x.get_shape())
+    return x
+
+
     def bp_fc(self, x, in_size, out_size, name):
         fc_name = '_'.join(name.split('_')[1:])
         with tf.variable_scope(fc_name):
@@ -203,7 +285,10 @@ class Vgg19:
             bias = tf.nn.bias_add(conv, b)
             output = tf.nn.relu(bias)
 
-            if self.cln_mode:
+            if self.bn_mode:
+                output = self.batch_norm(output, in_channels)
+
+            elif self.cln_mode:
                 #self.get_var(0, tr_name, 0, tr_name)
                 #tr_weight = tf.nn.moments(tr_weight, [1, 2])[0]
                 tr_sum = tf.reduce_sum(tr_weight, [1, 2])
@@ -211,11 +296,11 @@ class Vgg19:
                 dims = [1] + tr_weight.get_shape().as_list()[1:-1] + [1]
                 tr_weight = tf.sub(tr_weight, tf.tile(tr_sum, dims))
                 output = tf.mul(tr_weight, output)
-                
-            if self.ln_mode:
-                return layer_norm(output, center=True, scale=True, trainable=True)
 
-            return output
+                if self.ln_mode:
+                    return layer_norm(output, center=True, scale=True, trainable=True)
+            else:
+                return output
 
     def fc_layer(self, input_, in_size, out_size, name):
         with tf.variable_scope(name):

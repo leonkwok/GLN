@@ -23,8 +23,8 @@ learning_rate = 1e-05
 # load image set
 # at this stage, just load filename rather than real data
 # img1 = utils.load_image("./test_data/tiger.jpeg")
-dataset_images = list()
-dataset_labels = list() # for test
+dataset_images = []
+dataset_labels = [] # for test
 for subdir in os.listdir(path_dataset):
     if subdir.startswith('.'):
         continue
@@ -67,8 +67,9 @@ if __name__=='__main__':
     train_mode = tf.placeholder(tf.bool)
 
     #vgg = vgg19.Vgg19('./vgg19.npy')
-    vgg = vgg19.Vgg19(num_batch_size, ln_mode=True, cln_mode=False)
-    vgg.get_tr()
+
+    vgg = vgg19.Vgg19(num_batch_size, ln_mode=False, cln_mode=False, bn_mode=True)
+    bp_tr_op = vgg.get_tr()
     vgg.build_net(images, train_mode)
 
     # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
@@ -80,8 +81,7 @@ if __name__=='__main__':
     # iterate until the whole dataset is nearly trained 
     # remain a proportion of images which is insufficient to construct one batch
     num_data_trained = 0
-    for _ in range(10000):
-
+    for i in range(10000):
         # a batch of data
         batch_images = list()
         batch_labels = list()
@@ -120,8 +120,14 @@ if __name__=='__main__':
         correct_prediction = tf.equal(tf.argmax(vgg.prob, 1), tf.argmax(labels, 1))
         #TODO: PRINT THIS OUT
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        
+        if i == 0:
+            sess.run(bp_tr_op, feed_dict=train_feed_dict)
+
         sess.run(train, feed_dict=train_feed_dict)
         pred = sess.run(vgg.prob, feed_dict=test_feed_dict)
+        
+        
         for i in range(10):
             utils.print_prob(pred[i], './synset.txt')
         
@@ -134,7 +140,7 @@ if __name__=='__main__':
 
         # test classification
         # prob = sess.run(vgg.prob, feed_dict={images: batch1, train_mode: False})
-        #prob = sess.run(vgg.prob, feed_dict = test_feed_dict)
+        # prob = sess.run(vgg.prob, feed_dict = test_feed_dict)
         # TODO: labels text file...
         #utils.print_prob(prob[0], './synset.txt')
 
