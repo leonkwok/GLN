@@ -59,16 +59,16 @@ with open("./synset.txt", "w") as f:
     # dataset_labels.append(line) 
 # num_classes = max(dataset_labels) + 1 # i assume the num of labels start from 0
 
-with tf.device('/cpu:0'):
-    sess = tf.Session()
+if __name__=='__main__':
+    sess = tf.InteractiveSession()
 
     images = tf.placeholder(tf.float32, [num_batch_size, 224, 224, 3])
     labels = tf.placeholder(tf.float32, [num_batch_size, num_classes]) # totally num_classes categories
     train_mode = tf.placeholder(tf.bool)
 
     #vgg = vgg19.Vgg19('./vgg19.npy')
-    vgg = vgg19.Vgg19()
-    #vgg.get_tr()
+    vgg = vgg19.Vgg19(num_batch_size, ln_mode=True, cln_mode=False)
+    vgg.get_tr()
     vgg.build_net(images, train_mode)
 
     # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
@@ -80,7 +80,7 @@ with tf.device('/cpu:0'):
     # iterate until the whole dataset is nearly trained 
     # remain a proportion of images which is insufficient to construct one batch
     num_data_trained = 0
-    while True:
+    for _ in range(10000):
 
         # a batch of data
         batch_images = list()
@@ -112,16 +112,21 @@ with tf.device('/cpu:0'):
             train_mode : True
         }
 
+        test_feed_dict = {images: batch_images, train_mode: False}
+
         # simple 1-step training, train with one image 
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(vgg.prob, labels))
         train = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
-        # sess.run(train, feed_dict={images: batch1, labels: [dataset_labels], train_mode: True})
         correct_prediction = tf.equal(tf.argmax(vgg.prob, 1), tf.argmax(labels, 1))
         #TODO: PRINT THIS OUT
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
         sess.run(train, feed_dict=train_feed_dict)
+        pred = sess.run(vgg.prob, feed_dict=test_feed_dict)
+        for i in range(10):
+            utils.print_prob(pred[i], './synset.txt')
         
+        print(accuracy.eval(feed_dict={images: batch_images, labels: batch_labels, train_mode: False}))
+
         test_feed_dict = {
             images : batch_images,
             train_mode : False
@@ -135,8 +140,8 @@ with tf.device('/cpu:0'):
 
         # num of training images for next epoch is less than our batch size
         #num_data_trained += num_batch_size
-        if num_data_trained == 10000:#(num_data_trained + num_batch_size) > num_total_images:
-            break
+        #(num_data_trained + num_batch_size) > num_total_images:
+        
     # TODO: train the last training images
 
     # test save
