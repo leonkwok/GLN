@@ -10,6 +10,8 @@ import utils
 import numpy as np
 import os
 
+import random
+
 
 # configuration
 # currently i assume the ImageNet dataset consists of tons of image files and a single corresponding label file
@@ -81,21 +83,27 @@ if __name__=='__main__':
     # iterate until the whole dataset is nearly trained 
     # remain a proportion of images which is insufficient to construct one batch
     num_data_trained = 0
+    # for loading images randomly
+    dataset_toload = [i for i in range(len(dataset_images))]
+    print("check", len(dataset_toload), len(dataset_images))
     for i in range(10000):
         # a batch of data
         batch_images = list()
         batch_labels = list()
+        # a random batch of index
+        batch_rand = [random.choice(dataset_toload) for i in range(num_batch_size)]
 
-        batch_start = num_data_trained
-        batch_end = batch_start + num_batch_size
+        #batch_start = num_data_trained
+        #batch_end = batch_start + num_batch_size
         # construct a batch of training data (images & labels)
         for one_sample in range(batch_start, batch_end):
+            dataset_toload.remove(one_sample)
             # here we load real data
             image_file = utils.load_image(dataset_images[one_sample])
             # set the image batch size
             # batch1 = image_file.reshape((num_batch_size, 224, 224, 3))
             batch_images.append(image_file)
-            print(image_file.shape, dataset_images[one_sample])
+            print(image_file.shape, dataset_images[one_sample], "remove loaded:", one_sample)
             batch_labels.append(dataset_labels[one_sample])
 
         # convert list into array
