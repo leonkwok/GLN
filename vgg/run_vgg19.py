@@ -71,7 +71,7 @@ if __name__=='__main__':
     #vgg = vgg19.Vgg19('./vgg19.npy')
 
     vgg = vgg19.Vgg19(num_batch_size, ln_mode=False, cln_mode=False, bn_mode=True)
-    bp_tr_op = vgg.get_tr()
+    vgg.get_tr()
     vgg.build_net(images, train_mode)
 
     # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
@@ -96,7 +96,7 @@ if __name__=='__main__':
         #batch_start = num_data_trained
         #batch_end = batch_start + num_batch_size
         # construct a batch of training data (images & labels)
-        for one_sample in range(batch_start, batch_end):
+        for one_sample in batch_rand:
             dataset_toload.remove(one_sample)
             # here we load real data
             image_file = utils.load_image(dataset_images[one_sample])
@@ -129,8 +129,8 @@ if __name__=='__main__':
         #TODO: PRINT THIS OUT
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
         
-        if i == 0:
-            sess.run(bp_tr_op, feed_dict=train_feed_dict)
+        #if i == 0:
+        #    sess.run(bp_tr_op, feed_dict=train_feed_dict)
 
         sess.run(train, feed_dict=train_feed_dict)
         pred = sess.run(vgg.prob, feed_dict=test_feed_dict)
