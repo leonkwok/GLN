@@ -8,19 +8,20 @@ def bp_fc(self, x, in_size, out_size, name):
 
         return fc
 
-def bp_fc_2_pool(self, x, batch=1, height=7, width=7, channels=3):
-    return tf.reshape(x, [batch, height, width, channels])
+def bp_fc_2_pool(self, x, height=7, width=7, depth=512):
+    return tf.reshape(x, [1, height, width, depth])
 
-def bp_conv(self, x, in_channel, out_channel, name, output_shape):
+def bp_conv(self, x, output_shape, name,
+            in_channel, out_channel):
     conv_name = '_'.join(name.split('_')[1:])
     with tf.variable_scope(name):
         #filters, b = self.get_conv_var(3, out_channels, in_channels, name)
         #f_shape = filters.get_shape()
-        filters = tf.ones([3, 3, out_channel, in_channel])
-        deconv = tf.nn.conv2d_transpose(x, filters, output_shape, strides=[1, 1, 1, 1])
+        filter_ = tf.ones([3, 3, out_channel, in_channel])
+        deconv = tf.nn.conv2d_transpose(x, filter_, output_shape, strides=[1, 1, 1, 1])
         return deconv
 
-def unpool2x2(input_, name, in_channels=3):
+def unpool2x2(self, input_, name, in_channels=3):
     """N-dimensional version of the unpooling operation from
     https://www.robots.ox.ac.uk/~vgg/rg/papers/Dosovitskiy_Learning_to_Generate_2015_CVPR_paper.pdf
 

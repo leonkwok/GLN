@@ -13,7 +13,10 @@ class Vgg19:
     A trainable version VGG19.
     """
 
-    def __init__(self, vgg19_npy_path=None, trainable=True, ln_mode=False):
+    def __init__(self, batch, vgg19_npy_path=None, trainable=True, ln_mode=False, cln_mode=False):
+        if cln_mode and not ln_mode:
+            raise ValueError("unacceptable!")
+
         if vgg19_npy_path is not None:
             self.data_dict = np.load(vgg19_npy_path, encoding='latin1').item()
         else:
@@ -21,41 +24,59 @@ class Vgg19:
 
         self.var_dict = {}
         self.trainable = trainable
-        self.ln_mode = ln_mode
 
+        self.ln_mode = ln_mode
+        self.cln_mode = cln_mode
+
+        self.batch = batch
     def get_tr(self):
-        one = np.ones(1000)
-        self.tr_fc8 = tf.constant(one)
-        self.tr_fc7 = self.bp_fc(self.tr_fc8, 1000, 4096, "tr_fc8")
-        one = np.ones(4096)
-        self.tr_fc6 = self.bp_fc(self.tr_fc7, 4096, 4096, "tr_fc7")
+        #one = np.ones(1000)
+        #self.tr_fc8 = tf.constant(one)
+        #self.tr_fc7 = self.bp_fc(self.tr_fc8, 1000, 4096, "tr_fc8")
+        one = np.ones(25088)
+        self.tr_fc6 = tf.constant(one)
 
         self.tr_pool5 = self.bp_fc_2_pool(self.tr_fc6)
         self.tr_conv5_4 = self.unpool2x2(self.tr_pool5, 'tr_conv5_4')
-        self.tr_conv5_3 = self.bp_conv(self.tr_conv5_4, 512, 512, 'tr_conv5_3')
-        self.tr_conv5_2 = self.bp_conv(self.tr_conv5_3, 512, 512, 'tr_conv5_2')
-        self.tr_conv5_1 = self.bp_conv(self.tr_conv5_2, 512, 512, 'tr_conv5_1')
+        self.tr_conv5_3 = self.bp_conv(self.tr_conv5_4, [1, 14, 14, 512],
+                                       512, 512, 'tr_conv5_3')
+        self.tr_conv5_2 = self.bp_conv(self.tr_conv5_3, [1, 14, 14, 512],
+                                       512, 512, 'tr_conv5_2')
+        self.tr_conv5_1 = self.bp_conv(self.tr_conv5_2, [1, 14, 14, 512],
+                                       512, 512, 'tr_conv5_1')
 
-        self.tr_pool4 = self.bp_conv(self.tr_conv5_1, 512, 512, 'tr_pool4')
+        self.tr_pool4 = self.bp_conv(self.tr_conv5_1, [1, 14, 14, 512],
+                                     512, 512, 'tr_pool4')
         self.tr_conv4_4 = self.unpool2x2(self.tr_pool4, 'tr_conv4_4')
-        self.tr_conv4_3 = self.bp_conv(self.tr_conv4_4, 512, 512, 'tr_conv4_3')
-        self.tr_conv4_2 = self.bp_conv(self.tr_conv4_3, 512, 512, 'tr_conv4_2')
-        self.tr_conv4_1 = self.bp_conv(self.tr_conv4_2, 512, 512, 'tr_conv4_1')
+        self.tr_conv4_3 = self.bp_conv(self.tr_conv4_4, [1, 28, 28, 512],
+                                       512, 512, 'tr_conv4_3')
+        self.tr_conv4_2 = self.bp_conv(self.tr_conv4_3, [1, 28, 28, 512],
+                                       512, 512, 'tr_conv4_2')
+        self.tr_conv4_1 = self.bp_conv(self.tr_conv4_2, [1, 28, 28, 512],
+                                       512, 512, 'tr_conv4_1')
 
-        self.tr_pool3 = self.bp_conv(self.tr_conv4_1, 512, 256, 'tr_pool3')
-        self.tr_conv3_4 = self.unpool2x2(self.tr_pool3, tr_conv3_4)
-        self.tr_conv3_3 = self.bp_conv(self.tr_conv3_4, 256, 256, 'tr_conv3_3')
-        self.tr_conv3_2 = self.bp_conv(self.tr_conv3_3, 256, 256, 'tr_conv3_2')
-        self.tr_conv3_1 = self.bp_conv(self.tr_conv3_2, 256, 256, 'tr_conv3_1')
+        self.tr_pool3 = self.bp_conv(self.tr_conv4_1, [1, 28, 28, 256],
+                                     512, 256, 'tr_pool3')
+        self.tr_conv3_4 = self.unpool2x2(self.tr_pool3, 'tr_conv3_4')
+        self.tr_conv3_3 = self.bp_conv(self.tr_conv3_4, [1, 56, 56, 256],
+                                       256, 256, 'tr_conv3_3')
+        self.tr_conv3_2 = self.bp_conv(self.tr_conv3_3, [1, 56, 56, 256],
+                                       256, 256, 'tr_conv3_2')
+        self.tr_conv3_1 = self.bp_conv(self.tr_conv3_2, [1, 56, 56, 256],
+                                       256, 256, 'tr_conv3_1')
 
-        self.tr_pool2 = self.bp_conv(self.tr_conv3_1, 256, 128, 'tr_pool2')
+        self.tr_pool2 = self.bp_conv(self.tr_conv3_1, [1, 56, 56, 128],
+                                     256, 128, 'tr_pool2')
         self.tr_conv2_2 = self.unpool2x2(self.tr_pool2, 'tr_conv2_2')
-        self.tr_conv2_1 = self.bp_conv(self.tr_conv2_2, 128, 128, 'tr_conv2_1')
+        self.tr_conv2_1 = self.bp_conv(self.tr_conv2_2, [1, 112, 112, 128],
+                                       128, 128, 'tr_conv2_1')
 
-        self.tr_pool1 = self.bp_conv(self.tr_conv2_1, 128, 64, 'tr_pool1')
-        self.tr_conv1_2 = self.unpool2x2(self.pool1, 'tr_conv1_2')
-        self.tr_conv1_1 = self.bp_conv(self.tr_conv1_2, 64, 64, 'tr_conv1_1')
-        self.tr_brg = self.bp_conv(self.tr_conv1_1, 64, 3, 'tr_brg')
+        self.tr_pool1 = self.bp_conv(self.tr_conv2_1, [1, 112, 112, 64],
+                                     128, 64, 'tr_pool1')
+        self.tr_conv1_2 = self.unpool2x2(self.tr_pool1, 'tr_conv1_2')
+        self.tr_conv1_1 = self.bp_conv(self.tr_conv1_2, [1, 224, 224, 64],
+                                       64, 64, 'tr_conv1_1')
+        #self.tr_brg = self.bp_conv(self.tr_conv1_1, 64, 3, 'tr_brg')
 
     def build_net(self, rgb, train_mode=None):
         """
@@ -135,19 +156,20 @@ class Vgg19:
 
             return fc
 
-    def bp_fc_2_pool(self, x, batch=1, height=7, width=7, channels=3):
-        return tf.reshape(x, [batch, height, width, channels])
+    def bp_fc_2_pool(self, x, height=7, width=7, depth=512):
+        return tf.reshape(x, [1, height, width, depth])
 
-    def bp_conv(self, x, in_channel, out_channel, name, output_shape):
+    def bp_conv(self, x, output_shape, 
+                in_channel, out_channel, name):
         conv_name = '_'.join(name.split('_')[1:])
         with tf.variable_scope(name):
             #filters, b = self.get_conv_var(3, out_channels, in_channels, name)
             #f_shape = filters.get_shape()
-            filters = tf.ones([3, 3, out_channel, in_channel])
-            deconv = tf.nn.conv2d_transpose(x, filters, output_shape, strides=[1, 1, 1, 1])
+            filter_ = tf.ones([3, 3, out_channel, in_channel], dtype=tf.float64)
+            deconv = tf.nn.conv2d_transpose(x, filter_, output_shape, strides=[1, 1, 1, 1])
             return deconv
 
-    def unpool2x2(input_, name, in_channels=3):
+    def unpool2x2(self, input_, name):
         """N-dimensional version of the unpooling operation from
         https://www.robots.ox.ac.uk/~vgg/rg/papers/Dosovitskiy_Learning_to_Generate_2015_CVPR_paper.pdf
 
@@ -156,13 +178,13 @@ class Vgg19:
         """
         with tf.name_scope(name) as scope:
             sh = input_.get_shape().as_list()
-            #dim = len(sh[1:-1])
-            out = (tf.reshape(input_, [-1] + sh[-2:]))
-            for i in range(2, 0, -1):
-                out = tf.concat(i, [out, out])
-            out_size = [-1] + [s * 2 for s in sh[1:-1]] + [in_channels]
+            dim = len(sh[1:-1])
+            out = (tf.reshape(input_, [-1] + sh[-dim:]))
+            for i in range(dim, 0, -1):
+                out = tf.concat(i, [out, tf.zeros_like(out)])
+            out_size = [-1] + [s * 2 for s in sh[1:-1]] + [sh[-1]]
             out = tf.reshape(out, out_size, name=scope)
-            return out
+        return out
 
     def avg_pool(self, input_, name):
         return tf.nn.avg_pool(input_, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
@@ -171,21 +193,28 @@ class Vgg19:
         return tf.nn.max_pool(input_, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
     def conv_layer(self, input_, in_channels, out_channels, name):
+        tr_name = 'tr_' + name 
+        shape = input_.get_shape().as_list()[:-1] + [out_channels]
+        tr_weight = tf.get_variable(tr_name, shape)
         with tf.variable_scope(name):
             filters, b = self.get_conv_var(3, in_channels, out_channels, name)
 
             conv = tf.nn.conv2d(input_, filters, [1, 1, 1, 1], padding='SAME')
             bias = tf.nn.bias_add(conv, b)
             output = tf.nn.relu(bias)
+
+            if self.cln_mode:
+                #self.get_var(0, tr_name, 0, tr_name)
+                #tr_weight = tf.nn.moments(tr_weight, [1, 2])[0]
+                tr_sum = tf.reduce_sum(tr_weight, [1, 2])
+                tr_sum = tf.expand_dims(tf.expand_dims(tr_sum, 1), 2)
+                dims = [1] + tr_weight.get_shape().as_list()[1:-1] + [1]
+                tr_weight = tf.sub(tr_weight, tf.tile(tr_sum, dims))
+                output = tf.mul(tr_weight, output)
+                
             if self.ln_mode:
                 return layer_norm(output, center=True, scale=True, trainable=True)
-            #tr_name = 'tr_' + name 
-            #tr_weight = self.get_var(None, tr_name, None, tr_name)
-            #tr_weight = tf.nn.moments(tr_weight, [1, 2])
-            #tr_sum = tf.reduce_sum(tr_weight, [1, 2])
-            #tr_weight = tf.sub(tf_weight, tf.tile(tr_sum, tr_weight.get_shape()[:-1]))
-            #weighted_relu = tf.mul(tr_weight, relu)
-            #return weighted_relu
+
             return output
 
     def fc_layer(self, input_, in_size, out_size, name):
