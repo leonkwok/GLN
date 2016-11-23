@@ -248,7 +248,7 @@ class Vgg19:
             if self.bn_mode:
                 output = self.batch_norm(output, name)
                 return output
-                
+
             elif self.cln_mode:
                 #self.get_var(0, tr_name, 0, tr_name)
                 #tr_weight = tf.nn.moments(tr_weight, [1, 2])[0]
@@ -257,9 +257,11 @@ class Vgg19:
                 dims = [1] + tr_weight.get_shape().as_list()[1:-1] + [1]
                 tr_weight = tf.sub(tr_weight, tf.tile(tr_sum, dims))
                 output = tf.mul(tr_weight, output)
+                return layer_norm(output, center=True, scale=True, trainable=True)
 
-                if self.ln_mode:
-                    return layer_norm(output, center=True, scale=True, trainable=True)
+            elif self.ln_mode:
+                return layer_norm(output, center=True, scale=True, trainable=True)
+
             else:
                 return output
 
@@ -310,7 +312,6 @@ class Vgg19:
         return var
 
     def save_npy(self, sess, npy_path="./vgg19-save.npy"):
-        assert isinstance(sess, tf.Session)
 
         data_dict = {}
 
