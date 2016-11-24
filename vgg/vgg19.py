@@ -1,6 +1,6 @@
 import os 
 import tensorflow as tf
-from tensorflow.contrib.layers import layer_norm
+from tensorflow.contrib.layers import layer_norm, xavier_initializer, xavier_initializer_conv2d
 import numpy as np
 import time
 import inspect
@@ -110,13 +110,13 @@ class Vgg19:
         self.conv3_2 = self.conv_layer(self.conv3_1, 256, 256, "conv3_2")
         self.conv3_3 = self.conv_layer(self.conv3_2, 256, 256, "conv3_3")
         self.conv3_4 = self.conv_layer(self.conv3_3, 256, 256, "conv3_4")
-        self.pool3 = self.max_pool(self.conv3_4, 'pool3')
+        self.pool3 = self.max_pool(self.conv3_4, 'pool3') # 200704
 
         self.conv4_1 = self.conv_layer(self.pool3, 256, 512, "conv4_1")
         self.conv4_2 = self.conv_layer(self.conv4_1, 512, 512, "conv4_2")
         self.conv4_3 = self.conv_layer(self.conv4_2, 512, 512, "conv4_3")
         self.conv4_4 = self.conv_layer(self.conv4_3, 512, 512, "conv4_4")
-        self.pool4 = self.max_pool(self.conv4_4, 'pool4')
+        self.pool4 = self.max_pool(self.conv4_4, 'pool4') #((224 / (2 ** 4)) ** 2) * 512 = 100352
 
         self.conv5_1 = self.conv_layer(self.pool4, 512, 512, "conv5_1")
         self.conv5_2 = self.conv_layer(self.conv5_1, 512, 512, "conv5_2")
@@ -124,7 +124,7 @@ class Vgg19:
         self.conv5_4 = self.conv_layer(self.conv5_3, 512, 512, "conv5_4")
         self.pool5 = self.max_pool(self.conv5_4, 'pool5') 
 
-        self.fc6 = self.fc_layer(self.pool5, 25088, 4096, "fc6")  # 25088 = ((224 / (2 ** 5)) ** 2) * 512
+        self.fc6 = self.fc_layer(self.pool3, 25088, 4096, "fc6")  # 25088 = ((224 / (2 ** 5)) ** 2) * 512
         self.relu6 = tf.nn.relu(self.fc6)
         if train_mode is not None:
             self.relu6 = tf.cond(train_mode, lambda: tf.nn.dropout(self.relu6, 0.5), lambda: self.relu6)
@@ -234,18 +234,25 @@ class Vgg19:
         tr_name = 'tr_' + name 
         shape = input_.get_shape().as_list()[:-1] + [out_channels]
         tr_weight = tf.get_variable(tr_name, shape)
-        with tf.variable_scope(name):
-            filters, b = self.get_conv_var(3, in_channels, out_channels, name)
+        fil_shape = [3, 3, in_channels, out_channels]
 
+        with tf.variable_scope(name):
+            if self.norm_mode == 'bn':
+                input_ = self.batch_norm(input_, name)
+            filters = tf.get_variable(name+'_filters', 
+                                    fil_shape, 
+                                    dtype=tf.float32,
+                                    initializer=xavier_initializer_conv2d())#self.get_conv_var(3, in_channels, out_channels, name)
+            b = tf.get_variable(name+'_bias', [out_channels])
             conv = tf.nn.conv2d(input_, filters, [1, 1, 1, 1], padding='SAME')
             bias = tf.nn.bias_add(conv, b)
             output = tf.nn.relu(bias)
 
-            if self.norm_mode == 'bn':
-                output = self.batch_norm(output, name)
-                return output
+            #if self.norm_mode == 'bn':
+            #    output = self.batch_norm(output, name)
+            #    return output
 
-            elif self.norm_mode == 'cln':
+            if self.norm_mode == 'cln':
                 #self.get_var(0, tr_name, 0, tr_name)
                 #tr_weight = tf.nn.moments(tr_weight, [1, 2])[0]
                 tr_sum = tf.reduce_sum(tr_weight, [1, 2])
@@ -281,10 +288,10 @@ class Vgg19:
 
     def get_fc_var(self, in_size, out_size, name):
         #initial_value = tf.truncated_normal([in_size, out_size], 0.0, 0.001)
-        initial_value = tf.truncated_normal([in_size, out_size], 0.0, 0.001)
+        initial_value = tf.truncated_normal([in_size, out_size], 0.0, 0.1)
         weights = self.get_var(initial_value, name, 0, name + "_weights")
 
-        initial_value = tf.truncated_normal([out_size], .0, .001)
+        initial_value = tf.truncated_normal([out_size], .0, 0.1)
         biases = self.get_var(initial_value, name, 1, name + "_biases")
 
         return weights, biases

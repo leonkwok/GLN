@@ -1,5 +1,5 @@
-Tree
-Athlete
-Car
 Food
+Tree
 Bird
+Car
+Athlete
