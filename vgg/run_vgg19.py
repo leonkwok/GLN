@@ -5,7 +5,7 @@ import utils
 
 import numpy as np
 import os
-
+import sys
 import random
 from sklearn import preprocessing
 
@@ -18,7 +18,7 @@ num_test_size = 500
 path_dataset = "../../big_data/Imagenet_dataset/"
 # path_dataset = "dataset/ImageNet/"
 learning_rate = 1e-05
-
+mode = sys.argv[1]
 # load training image_path & labels
 # at this stage, just load filename rather than real data
 dataset_images = list()
@@ -62,7 +62,7 @@ for test_label_file in test_paths_labels:
         lines = f.readlines()
         for line in lines:
             test_image_file_name = line.strip("\n")
-            print(test_image_file_name)
+            #print(test_image_file_name)
             test_image_file_label_index[test_image_file_name] = class_code
             # print(test_image_file_name, class_code)
 # load all test images
@@ -94,8 +94,8 @@ if __name__=='__main__':
     train_mode = tf.placeholder(tf.bool)
 
     #vgg = vgg19.Vgg19('./vgg19.npy')
-
-    vgg = vgg19.Vgg19(num_batch_size, ln_mode=False, cln_mode=True, bn_mode=False)
+    print (mode)
+    vgg = vgg19.Vgg19(num_batch_size, norm_mode=mode)
     vgg.get_tr()
     vgg.build_net(images, train_mode)
 
@@ -144,13 +144,11 @@ if __name__=='__main__':
         }
 
         # simple 1-step training, train with one image 
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(vgg.prob, labels))
+        cross_entropy = tf.reduce_mean(-tf.reduce_sum(labels * tf.log(vgg.prob), reduction_indices=[1]))
+        print ('cross entropy: ', cross_entropy.eval(feed_dict=train_feed_dict))
         train = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
         correct_prediction = tf.equal(tf.argmax(vgg.prob, 1), tf.argmax(labels, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        # TODO: PRINT THIS OUT
-        #if i == 0:
-        #    sess.run(bp_tr_op, feed_dict=train_feed_dict)
 
         sess.run(train, feed_dict=train_feed_dict)
         #for i in range(10):
@@ -158,7 +156,7 @@ if __name__=='__main__':
         
 
 
-        if i % 50 == 0:
+        if i % 10 == 0:
             #train_accuracy = accuracy.eval(feed_dict=train_feed_dict)
             acc_sum = 0#accuracy.eval(feed_dict=test_feed_dict)
             for num in range(50):
@@ -172,7 +170,7 @@ if __name__=='__main__':
                 #print (num, acc)
                 print(acc_sum)
             acc_sum /= 50
-            with open('./cln_accuracy.txt', 'a') as f:
+            with open('./ln_accuracy.txt', 'a') as f:
                 f.write(str(acc_sum)+'\n')
 
     # test save

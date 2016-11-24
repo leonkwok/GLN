@@ -13,9 +13,9 @@ class Vgg19:
     A trainable version VGG19.
     """
 
-    def __init__(self, batch, vgg19_npy_path=None, trainable=True, ln_mode=False, cln_mode=False, bn_mode=False):
-        if cln_mode and not ln_mode:
-            raise ValueError("unacceptable!")
+    def __init__(self, batch, vgg19_npy_path=None, trainable=True, norm_mode=None):
+        #if cln_mode and not ln_mode:
+        #    raise ValueError("unacceptable!")
 
         if vgg19_npy_path is not None:
             self.data_dict = np.load(vgg19_npy_path, encoding='latin1').item()
@@ -24,11 +24,7 @@ class Vgg19:
 
         self.var_dict = {}
         self.trainable = trainable
-
-        self.ln_mode = ln_mode
-        self.cln_mode = cln_mode
-        self.bn_mode = bn_mode
-
+        self.norm_mode = norm_mode
         self.batch = batch
 
     def get_tr(self):
@@ -245,11 +241,11 @@ class Vgg19:
             bias = tf.nn.bias_add(conv, b)
             output = tf.nn.relu(bias)
 
-            if self.bn_mode:
+            if self.norm_mode == 'bn':
                 output = self.batch_norm(output, name)
                 return output
 
-            elif self.cln_mode:
+            elif self.norm_mode == 'cln':
                 #self.get_var(0, tr_name, 0, tr_name)
                 #tr_weight = tf.nn.moments(tr_weight, [1, 2])[0]
                 tr_sum = tf.reduce_sum(tr_weight, [1, 2])
@@ -259,7 +255,7 @@ class Vgg19:
                 output = tf.mul(tr_weight, output)
                 return layer_norm(output, center=True, scale=True, trainable=True)
 
-            elif self.ln_mode:
+            elif self.norm_mode == 'ln':
                 return layer_norm(output, center=True, scale=True, trainable=True)
 
             else:
