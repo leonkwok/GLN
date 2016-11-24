@@ -16,6 +16,7 @@ num_classes = 0
 num_batch_size = 20
 num_test_size = 500
 path_dataset = "../../big_data/Imagenet_dataset/"
+checkpoint_dir = "./"
 # path_dataset = "dataset/ImageNet/"
 learning_rate = 0.001
 mode = sys.argv[1]
@@ -119,6 +120,8 @@ if __name__=='__main__':
     # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
     # print(vgg.get_var_count())
 
+    # init checkpoint
+    saver = tf.train.Saver()
     sess.run(tf.initialize_all_variables())
 
     num_data_trained = 0
@@ -130,7 +133,7 @@ if __name__=='__main__':
     # i = 0
     # while len(dataset_toload) >= num_batch_size:
     #     i += 1
-    for i in range(1, 1100):
+    for i in range(1, 10000):
         # a batch of data
         print ('iteration:', i)
         batch_images = list()
@@ -140,7 +143,7 @@ if __name__=='__main__':
         for _ in range(num_batch_size):
             rand_chosen_ind = random.choice(dataset_toload)
             batch_rand.append(rand_chosen_ind)
-            dataset_toload.remove(rand_chosen_ind)
+            # dataset_toload.remove(rand_chosen_ind)
 
         # construct a batch of training data (images & labels)
         for one_sample in batch_rand:
@@ -170,6 +173,8 @@ if __name__=='__main__':
         sess.run(train, feed_dict=train_feed_dict)
         
         if i % 50 == 0:
+            # checkpoint
+            saver.save(sess, checkpoint_dir + 'model.ckpt', global_step=i)
             #train_accuracy = accuracy.eval(feed_dict=train_feed_dict)
             with open('./'+mode+'cost.txt', 'a') as f:
                 f.write(str(acc)+'\n')
