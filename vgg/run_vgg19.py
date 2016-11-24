@@ -13,7 +13,7 @@ from sklearn import preprocessing
 # currently i assume the ImageNet dataset consists of tons of image files and a single corresponding label file
 num_total_images = 0
 num_classes = 0
-num_batch_size = 1
+num_batch_size = 20
 num_test_size = 500
 path_dataset = "../../big_data/Imagenet_dataset/"
 # path_dataset = "dataset/ImageNet/"
@@ -96,17 +96,26 @@ if __name__=='__main__':
     train_mode = tf.placeholder(tf.bool)
 
     #vgg = vgg19.Vgg19('./vgg19.npy')
-    print (mode)
+
     vgg = vgg19.Vgg19(num_batch_size, norm_mode=mode)
     #vgg.get_tr()
     vgg.build_net(images, train_mode)
     cost = tf.reduce_sum((vgg.prob - labels) ** 2) 
+    correct_prediction = tf.equal(tf.argmax(vgg.prob, 1), tf.argmax(labels, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     cross_entropy = tf.reduce_mean(-tf.reduce_sum(labels * tf.log(vgg.prob), reduction_indices=[1]))
     #cost_val = cost.eval(feed_dict=train_feed_dict)
     #print ('cross entropy: ', cost_val)
-    train = tf.train.AdamOptimizer(0.0001).minimize(cost)
-    correct_prediction = tf.equal(tf.argmax(vgg.prob, 1), tf.argmax(labels, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    if mode == 'bn':
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
+        if update_ops: 
+            updates = tf.group(*update_ops)
+        with tf.control_dependencies([updates]):
+            train = tf.train.AdamOptimizer(0.0001).minimize(cost)
+    else:
+        train = tf.train.AdamOptimizer(0.0001).minimize(cost)
+
+
     # print number of variables used: 143667240 variables, i.e. ideal size = 548MB
     # print(vgg.get_var_count())
 
@@ -125,9 +134,9 @@ if __name__=='__main__':
         # a random batch of index
         batch_rand = list()
         for _ in range(num_batch_size):
-            rand_chosen_ind = 0#random.choice(dataset_toload)
+            rand_chosen_ind = random.choice(dataset_toload)
             batch_rand.append(rand_chosen_ind)
-            #dataset_toload.remove(rand_chosen_ind)
+            dataset_toload.remove(rand_chosen_ind)
 
         # construct a batch of training data (images & labels)
         for one_sample in batch_rand:
@@ -152,35 +161,28 @@ if __name__=='__main__':
         }
 
         # simple 1-step training, train with one image
-        cost_val = cost.eval(feed_dict=train_feed_dict)
-        print ('cross entropy: ', cost_val)
+        acc = cost.eval(feed_dict=train_feed_dict)
+        print ('cross entropy: ', acc)
         sess.run(train, feed_dict=train_feed_dict)
-        print (vgg.prob.eval(feed_dict=train_feed_dict))
-        if i % 10 == 0:
-            with open('./cost.txt', 'a') as f:
-                f.write(str(cost_val)+'\n')
-        #for i in range(10):
-        #    utils.print_prob(pred[i], './synset.txt')
         
-
-
-        if i % 111111111 == 0:
+        if i % 50 == 0:
             #train_accuracy = accuracy.eval(feed_dict=train_feed_dict)
+            with open('./'+mode+'cost.txt', 'a') as f:
+                f.write(str(acc)+'\n')
             acc_sum = 0#accuracy.eval(feed_dict=test_feed_dict)
-            for num in range(50):
+            for j in range(25):
                 test_feed_dict = {
-                    images : test_dataset_images[num_batch_size*num:num_batch_size*num+num_batch_size], 
-                    labels : test_dataset_labels[num_batch_size*num:num_batch_size*num+num_batch_size], 
+                    images : test_dataset_images[num_batch_size*j: num_batch_size*j+num_batch_size], 
+                    labels : test_dataset_labels[num_batch_size*j: num_batch_size*j+num_batch_size], 
                     train_mode: False
                 }
                 
-                acc_sum += accuracy.eval(feed_dict=test_feed_dict)
+                acc_sum += cost.eval(feed_dict=test_feed_dict)
                 #print (num, acc)
                 print(acc_sum)
-            acc_sum /= 50
-            with open('./ln_accuracy.txt', 'a') as f:
-                f.write(str(acc_sum)+'\n')
-
+            acc_sum /= 25
+            with open('./'+mode+'_test_accuracy.txt', 'a') as f1:
+                f1.write(str(acc_sum)+'\n')
         #if i % 50 == 0：
 
     # test save
