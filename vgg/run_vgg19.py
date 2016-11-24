@@ -17,7 +17,7 @@ num_batch_size = 10
 num_test_size = 500
 path_dataset = "../../big_data/Imagenet_dataset/"
 # path_dataset = "dataset/ImageNet/"
-learning_rate = 1e-05
+learning_rate = 0.001
 mode = sys.argv[1]
 # load training image_path & labels
 # at this stage, just load filename rather than real data
@@ -109,7 +109,7 @@ if __name__=='__main__':
     dataset_toload = [i for i in range(len(dataset_images))]
     print("check", len(dataset_toload), len(dataset_images))
     random.seed()
-    for i in range(10000):
+    for i in range(1, 10000):
         # a batch of data
         print ('iteration:', i)
         batch_images = list()
@@ -143,10 +143,11 @@ if __name__=='__main__':
             train_mode : True
         }
 
-        # simple 1-step training, train with one image 
+        # simple 1-step training, train with one image
+        cost = tf.reduce_sum((vgg.prob - labels) ** 2) 
         cross_entropy = tf.reduce_mean(-tf.reduce_sum(labels * tf.log(vgg.prob), reduction_indices=[1]))
-        print ('cross entropy: ', cross_entropy.eval(feed_dict=train_feed_dict))
-        train = tf.train.GradientDescentOptimizer(learning_rate).minimize(cross_entropy)
+        print ('cross entropy: ', cost.eval(feed_dict=train_feed_dict))
+        train = tf.train.GradientDescentOptimizer(0.0001).minimize(cost)
         correct_prediction = tf.equal(tf.argmax(vgg.prob, 1), tf.argmax(labels, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
@@ -156,7 +157,7 @@ if __name__=='__main__':
         
 
 
-        if i % 10 == 0:
+        if i % 7777 == 0:
             #train_accuracy = accuracy.eval(feed_dict=train_feed_dict)
             acc_sum = 0#accuracy.eval(feed_dict=test_feed_dict)
             for num in range(50):
@@ -172,6 +173,8 @@ if __name__=='__main__':
             acc_sum /= 50
             with open('./ln_accuracy.txt', 'a') as f:
                 f.write(str(acc_sum)+'\n')
+
+        #if i % 50 == 0：
 
     # test save
     #vgg.save_npy(sess, './test-save.npy')
