@@ -117,7 +117,10 @@ if __name__=='__main__':
     dataset_toload = [i for i in range(len(dataset_images))]
     print("check", len(dataset_toload), len(dataset_images))
     random.seed()
-    for i in range(1, 10000):
+    i = 0
+    # will leave several images untrained
+    while len(toload) >= num_batch_size:
+        i += 1
         # a batch of data
         print ('iteration:', i)
         batch_images = list()
